@@ -30,6 +30,7 @@
             haskell.compiler.ghc912
             (haskell-language-server.override { supportedGhcVersions = [ "912" ]; })
             cabal2nix
+            zlib
           ];
           inputsFrom = map (__getAttr "env") (__attrValues self.packages.${system});
         };
