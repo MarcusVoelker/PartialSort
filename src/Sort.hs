@@ -66,6 +66,8 @@ query oracle e0 e1 = do
     val <- lift $ oracle e0 e1
     compMatrix %= M.insert (e0,e1) val
     compMatrix %= M.insert (e1,e0) (nComp val)
+    compMatrix %= closureAdd e0
+    compMatrix %= closureAdd e1
     return val
 
 findLt :: (PrimMonad m, Ord a, HasCompMatrix s (Map (a,a) Comp)) => Oracle m a -> MVector (PrimState m) a -> a -> Int -> Int -> StateT s m Int
@@ -235,6 +237,41 @@ pSort oracle handler (e0:elems) = do
   (SortState (CD dec) mat _) <- execStateT (handleAll oracle handler) state0
   decF <- deepFreeze dec
   return $ SortResult decF mat
+
+closure :: (Ord a) => Map (a,a) Comp -> Map (a,a) Comp
+closure m = let
+  as = S.map fst $ M.keysSet m
+  in
+    foldr (\k s ->
+      foldr (\i s' ->
+        foldr (\j s'' ->
+          if s'' M.!? (i,k) == Just Lt && s'' M.!? (k,j) == Just Lt then
+            M.insert (j,i) Gt $ M.insert (i,j) Lt s''
+          else
+            s''
+          ) s' as
+        ) s as
+      ) m as
+
+closureAdd :: (Ord a) => a -> Map (a,a) Comp  -> Map (a,a) Comp
+closureAdd a m = let
+  as = S.map fst $ M.keysSet m
+  m1 = foldr (\k s ->
+      foldr (\i s' ->
+          if s' M.!? (i,k) == Just Lt && s' M.!? (k,a) == Just Lt then
+            M.insert (a,i) Gt $ M.insert (i,a) Lt s'
+          else
+            s'
+        ) s as
+      ) m as
+  in foldr (\k s ->
+      foldr (\j s' ->
+          if s' M.!? (a,k) == Just Lt && s' M.!? (k,j) == Just Lt then
+            M.insert (j,a) Gt $ M.insert (a,j) Lt s'
+          else
+            s'
+        ) s as
+      ) m as
 
 reduction :: (Ord a) => Map (a,a) Comp -> Set (a,a)
 reduction m = let
